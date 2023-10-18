@@ -1,10 +1,10 @@
-WITH YKJ AS ( 
+WITH BaseData AS (
     SELECT
         TC1.CODE_NAME AS DIR_TYPE_NAME,
         TC2.CODE_NAME AS COMMODITY_CATEGORY_NAME,
         MDYS.DIR_TYPE,
         MDYS.COMMODITY_CATEGORY,
-        MDYS.CONTRACE_VOL / 1000 AS CONTRACT_VOL 
+        (MDYS.CONTRACE_VOL / 1000) AS CONTRACR_VOL 
     FROM
         M_RESOURCE_MASTER RM 
     LEFT OUTER JOIN V_MMS_DELTA_KW_YAKUJO_SUM MDYS 
@@ -21,81 +21,53 @@ WITH YKJ AS (
         RM.RESOURCE_KANRI_NO = :resourceKanriNO 
         AND RM.START_YYYYMMDD <= :startDay 
         AND RM.END_YYYYMMDD >= :endtDay
-) 
-
-SELECT
-    DIR_TYPE_NAME,
-    COMMODITY_CATEGORY_NAME,
-    DIR_TYPE,
-    COMMODITY_CATEGORY,
-    CONTRACT_VOL 
-FROM
-    YKJ 
-WHERE
-    (
-        -- 条件1: 商品区分に4000が存在する場合はそのまま取得
-        COMMODITY_CATEGORY = '4000'
-    )
-    OR
-    (
-        -- 条件2: 商品区分が3200、3100、2200のいずれかを持ち、かつ条件1のレコードがない場合に最小の商品区分の値のレコードのみ抽出
-        COMMODITY_CATEGORY IN ('3200', '3100', '2200')
-        AND (
-            SELECT
-                COUNT(*)
-            FROM
-                YKJ 
-            WHERE
-                COMMODITY_CATEGORY IN ('4000', '2100', '1000')
-            ) = 0 
-            AND (
-                SELECT
-                    COUNT(*)
-                FROM
-                    YKJ 
-                WHERE
-                    COMMODITY_CATEGORY IN ('3200', '3100', '2200')
-                ) > 1 
-            AND COMMODITY_CATEGORY = (
-                SELECT
-                    MIN(COMMODITY_CATEGORY)
-                FROM
-                    YKJ 
-                WHERE
-                    COMMODITY_CATEGORY IN ('3000', '3100', '2200')
-            )
-    )
-    OR
-    (
-        -- 条件3: 商品区分が3200、3100、2200、2100、1000のいずれかを持ち、かつ条件1と条件2のレコードがない場合にそのまま取得
-        COMMODITY_CATEGORY IN ('3200', '3100', '2200', '2100', '1000')
-        AND (
-            SELECT
-                COUNT(*)
-            FROM
-                YKJ 
-            WHERE
-                COMMODITY_CATEGORY IN ('3200', '3100', '2200')
-            ) = 0 
-            AND (
-                SELECT
-                    COUNT(*)
-                FROM
-                    YKJ 
-                WHERE
-                    COMMODITY_CATEGORY = '4000'
-                ) = 0 
-    )
-    OR
-    (
-        -- 条件4: 商品区分が3200、3100、2200、2100、1000のいずれかが1つだけある場合にそのまま取得
-        COMMODITY_CATEGORY IN ('3200', '3100', '2200', '2100', '1000')
-        AND (
-            SELECT
-                COUNT(DISTINCT COMMODITY_CATEGORY)
-            FROM
-                YKJ 
-            WHERE
-                COMMODITY_CATEGORY IN ('3200', '3100', '2200', '2100', '1000')
-            ) = 1
-    );
+),
+CountsByDirType AS (
+    SELECT 
+        DIR_TYPE_NAME, 
+        DIR_TYPE,
+        COMMODITY_CATEGORY,
+        COUNT(*) AS CNT
+    FROM BaseData
+    GROUP BY DIR_TYPE_NAME, DIR_TYPE, COMMODITY_CATEGORY
+),
+Cat4000 AS (
+    SELECT *
+    FROM BaseData
+    WHERE COMMODITY_CATEGORY = '4000'
+),
+Cat3100_3200_2200 AS (
+    SELECT *
+    FROM BaseData 
+    WHERE COMMODITY_CATEGORY IN ('3200', '3100', '2200') 
+    AND COALESCE((SELECT MAX(CNT) FROM CountsByDirType WHERE COMMODITY_CATEGORY IN ('4000', '2100', '1000')), 0) = 0 
+    AND COALESCE((SELECT MAX(CNT) FROM CountsByDirType WHERE COMMODITY_CATEGORY IN ('3200', '3100', '2200')), 0) > 1 
+),
+Cat4000_2 AS (
+    SELECT
+        DIR_TYPE_NAME,
+        TC1.CODE_NAME AS COMMODITY_CATEGORY_NAME,
+        DIR_TYPE,
+        '4000' AS COMMODITY_CATEGORY,
+        CONTRACR_VOL 
+    FROM BaseData
+    LEFT OUTER JOIN T_CODE TC1 
+        ON CONCAT(TC1.CODE_ID, '00') = '4000' 
+        AND TC1.TARGET_ID = 'COMMODITY_CATEGORY' 
+    WHERE COMMODITY_CATEGORY NOT IN ('4000') 
+    AND COALESCE((SELECT MAX(CNT) FROM CountsByDirType WHERE COMMODITY_CATEGORY IN ('3200', '3100', '2200')), 0) > 0 
+    AND COALESCE((SELECT MAX(CNT) FROM CountsByDirType WHERE COMMODITY_CATEGORY IN ('2100', '1000')), 0) > 0 
+),
+CatSingle AS (
+    SELECT *
+    FROM BaseData
+    WHERE COMMODITY_CATEGORY NOT IN ('4000') 
+    AND COALESCE((SELECT MAX(CNT) FROM CountsByDirType WHERE COMMODITY_CATEGORY NOT IN ('4000')), 0) = 1
+)
+SELECT * FROM Cat4000
+UNION ALL 
+SELECT * FROM Cat3100_3200_2200 
+UNION ALL 
+SELECT * FROM Cat4000_2 
+UNION ALL 
+SELECT * FROM CatSingle;
