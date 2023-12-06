@@ -1,6 +1,14 @@
-SELECT s.sid, t.xidusn, t.xidsqn, t.xidslt, l.object_id, o.object_name
-FROM v$lock l, v$transaction t, dba_objects o, v$session s
-WHERE t.xidusn = l.id1
-  AND l.type = 'TX'
-  AND l.sid = s.sid
-  AND o.object_id = l.id2;
+SELECT
+  lo.object_id,
+  ao.object_name,
+  vs.sid,
+  vs.serial#,
+  vs.username,
+  vs.osuser,
+  vs.status
+FROM
+  v$locked_object lo
+  JOIN dba_objects ao ON lo.object_id = ao.object_id
+  JOIN v$session vs ON lo.session_id = vs.sid
+WHERE
+  ao.object_name = 'YOUR_TABLE_NAME';  -- ここにテーブル名を指定
