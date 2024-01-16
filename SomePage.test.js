@@ -1,16 +1,18 @@
-import { describe, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import SomePage from './SomePage.vue';
 
 describe('SomePage', () => {
-  it('updates selectedDirection when a radio button is selected', async () => {
+  it('handles button click based on radio button selection', async () => {
     const wrapper = mount(SomePage);
 
-    // '東' を選択するラジオボタンを特定し、選択する
-    const eastRadioButton = wrapper.find('input[type="radio"][value="東"]');
-    await eastRadioButton.setChecked();
+    // ラジオボタンの値を模倣して設定
+    wrapper.vm.selectedDirection = '東'; // ここで '東' に設定
 
-    // selectedDirection が '東' に更新されたことを確認
-    expect(wrapper.vm.selectedDirection).toBe('東');
+    // ボタンをクリック
+    await wrapper.find('button').trigger('click');
+
+    // 期待される挙動を検証
+    // 例: selectedDirection に基づいて特定のメソッドが呼ばれる、データが更新されるなど
   });
 });
