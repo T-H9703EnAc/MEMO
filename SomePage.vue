@@ -1,8 +1,7 @@
 <template>
   <div>
-    <h1>方角を選択してください</h1>
     <CustomRadioButton v-model="selectedDirection" />
-    <!-- 他のコンテンツやロジック -->
+    <button @click="handleSubmit">送信</button>
   </div>
 </template>
 
@@ -11,9 +10,7 @@ import { ref } from 'vue';
 import CustomRadioButton from './CustomRadioButton.vue';
 
 const selectedDirection = ref('');
-// 他のスクリプトやメソッド
+const handleSubmit = () => {
+  // ラジオボタンの値に基づいた処理をここで行う
+};
 </script>
-
-<style>
-/* スタイル */
-</style>
